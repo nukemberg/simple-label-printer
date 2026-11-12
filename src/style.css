@@ -126,6 +126,7 @@ textarea#text {
 	color: var(--fg);
 	resize: none;
 	field-sizing: content;
+	overflow-x: auto;
 	max-height: 40dvh;
 }
 textarea#text:focus {

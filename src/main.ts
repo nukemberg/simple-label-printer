@@ -191,10 +191,18 @@ function draw() {
 	tapeEl.classList.toggle('continuous', tape.continuous);
 	tapeEl.classList.toggle('die-cut', !tape.continuous);
 
+	// The text box mirrors the label: on continuous tape lines only break where Enter was pressed.
+	textEl.wrap = tape.continuous ? 'off' : 'soft';
+	const longest = Math.max(...textEl.value.split('\n').map((l) => l.length));
+	textEl.style.fontSize = tape.continuous && longest > 14 ? `${Math.max(22, Math.round(34 * 14 / longest))}px` : '';
+
 	const mm = Math.round(rendered.lengthMm);
 	if (rendered.overflow) noteEl.textContent = 'הטקסט ארוך מדי למדבקה הזו';
 	else if (!textEl.value.trim()) noteEl.textContent = '';
-	else noteEl.textContent = tape.continuous ? `אורך המדבקה: ${mm} מ״מ` : `מדבקה ${tape.widthMm}×${tape.lengthMm} מ״מ`;
+	else if (tape.continuous)
+		noteEl.textContent =
+			rendered.lines.length === 1 && mm > 80 ? `אורך המדבקה: ${mm} מ״מ · Enter = שתי שורות, מדבקה קצרה יותר` : `אורך המדבקה: ${mm} מ״מ`;
+	else noteEl.textContent = `מדבקה ${tape.widthMm}×${tape.lengthMm} מ״מ`;
 }
 
 // ---------- recent texts ----------
