@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="theme-color" content="#1f6feb" />
+		<link rel="icon" href="icon.svg" type="image/svg+xml" />
+		<link rel="apple-touch-icon" href="icon-192.png" />
+		<title>מדפסת מדבקות</title>
+	</head>
+	<body>
+		<header class="bar">
+			<button id="status" class="status" type="button" aria-live="polite">
+				<span class="dot"></span><span id="status-text">המדפסת לא מחוברת</span>
+			</button>
+			<span id="battery" class="battery" hidden></span>
+			<button id="open-settings" class="icon-btn" type="button" aria-label="הגדרות">⚙</button>
+		</header>
+
+		<main>
+			<textarea id="text" rows="2" dir="auto" placeholder="מה לכתוב על המדבקה?" autocomplete="off" spellcheck="false"></textarea>
+
+			<div id="recent" class="recent"></div>
+
+			<section class="preview-wrap" aria-label="תצוגה מקדימה">
+				<div id="tape" class="tape"><canvas id="preview"></canvas></div>
+				<div id="preview-note" class="note"></div>
+			</section>
+
+			<div class="copies">
+				<span>עותקים</span>
+				<button id="minus" type="button" class="round" aria-label="פחות">−</button>
+				<output id="copies">1</output>
+				<button id="plus" type="button" class="round" aria-label="יותר">+</button>
+			</div>
+
+			<div id="message" class="message" role="alert" hidden></div>
+
+			<button id="print" class="print" type="button">הדפסה</button>
+		</main>
+
+		<dialog id="settings">
+			<form method="dialog" class="settings">
+				<h2>הגדרות</h2>
+
+				<label>חיבור
+					<select id="set-link">
+						<option value="ble">בלוטות׳ (BLE)</option>
+						<option value="serial">בלוטות׳ קלאסי (Serial)</option>
+					</select>
+				</label>
+
+				<label>סוג מדבקה
+					<select id="set-tape"></select>
+				</label>
+
+				<label>כהות הדפסה: <output id="density-out">4</output>
+					<input id="set-density" type="range" min="1" max="7" step="1" />
+				</label>
+
+				<label>עובי אותיות
+					<select id="set-weight">
+						<option value="500">רגיל</option>
+						<option value="700">מודגש</option>
+						<option value="900">עבה</option>
+					</select>
+				</label>
+
+				<label>גודל טקסט בגליל רציף
+					<select id="set-size">
+						<option value="1">גדול (כל הגובה)</option>
+						<option value="0.75">בינוני</option>
+						<option value="0.55">קטן (מדבקה קצרה יותר)</option>
+					</select>
+				</label>
+
+				<label class="check"><input id="set-rotate" type="checkbox" /> סיבוב 180° (אם ההדפסה הפוכה)</label>
+
+				<div class="row">
+					<button id="test-print" type="button">הדפסת בדיקה</button>
+					<button id="disconnect" type="button">ניתוק</button>
+				</div>
+
+				<details>
+					<summary>יומן תקשורת</summary>
+					<textarea id="log" rows="8" dir="ltr" readonly></textarea>
+					<button id="copy-log" type="button">העתקה</button>
+				</details>
+
+				<p class="about">עובד בלי אינטרנט. דורש Chrome או Edge (אנדרואיד / מחשב).</p>
+
+				<button class="close" value="close">סגירה</button>
+			</form>
+		</dialog>
+
+		<script type="module" src="./src/main.ts"></script>
+	</body>
+</html>
