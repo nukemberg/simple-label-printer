@@ -6,6 +6,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { bleSupported, Printer, serialSupported, type LinkKind, type PrinterInfo } from './connection';
 import { DEFAULT_RENDER, DPMM, headFor, renderLabel, rotate180, type Model, type Rendered } from './render';
 import { MANUAL_TAPES, Q30_TAPES, type Tape } from './tape';
+import type { Q30Protocol } from './q30';
 import type { Bitmap } from './printer/types';
 
 registerSW({ immediate: true });
@@ -24,6 +25,7 @@ interface Settings {
 	lastTape: Tape | null;
 	/** Index into Q30_TAPES: the Q30 can't report its labels. */
 	q30Tape: number;
+	q30Protocol: Q30Protocol;
 	/** Last printer model connected, so the preview matches it before connecting. */
 	model: Model;
 	recent: string[];
@@ -38,6 +40,7 @@ const defaults: Settings = {
 	tape: -1,
 	lastTape: null,
 	q30Tape: 0,
+	q30Protocol: 'm110',
 	model: 'e10',
 	recent: []
 };
@@ -76,6 +79,7 @@ const dialog = $<HTMLDialogElement>('settings');
 const setLink = $<HTMLSelectElement>('set-link');
 const setTape = $<HTMLSelectElement>('set-tape');
 const setQ30Tape = $<HTMLSelectElement>('set-q30-tape');
+const setQ30Protocol = $<HTMLSelectElement>('set-q30-protocol');
 const setDensity = $<HTMLInputElement>('set-density');
 const densityOut = $<HTMLOutputElement>('density-out');
 const setWeight = $<HTMLSelectElement>('set-weight');
@@ -302,7 +306,7 @@ async function print(bitmap?: Bitmap) {
 		}
 		showMessage('');
 		const isText = bitmap === rendered?.bitmap;
-		await printer.print(settings.rotate ? rotate180(bitmap) : bitmap, currentTape(), { copies, density: settings.density });
+		await printer.print(settings.rotate ? rotate180(bitmap) : bitmap, currentTape(), { copies, density: settings.density, q30Protocol: settings.q30Protocol });
 		if (isText) remember(text);
 		copies = 1;
 		copiesEl.value = '1';
@@ -369,6 +373,7 @@ $('open-settings').addEventListener('click', () => {
 	setLink.value = settings.link;
 	setTape.value = String(settings.tape);
 	setQ30Tape.value = String(settings.q30Tape);
+	setQ30Protocol.value = settings.q30Protocol;
 	setDensity.value = String(settings.density);
 	densityOut.value = String(settings.density);
 	setWeight.value = String(settings.weight);
@@ -387,6 +392,10 @@ setQ30Tape.addEventListener('change', () => {
 	settings.q30Tape = Number(setQ30Tape.value);
 	save();
 	onPrinterChange(printer.info);
+});
+setQ30Protocol.addEventListener('change', () => {
+	settings.q30Protocol = setQ30Protocol.value as Q30Protocol;
+	save();
 });
 setTape.addEventListener('change', () => {
 	settings.tape = Number(setTape.value);

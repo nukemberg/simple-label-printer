@@ -4,6 +4,7 @@ import type { Tape } from './tape';
 /** E10: 8 dots/mm, 96-dot head of which the middle 88 are printed. */
 export const DPMM = 8;
 export const BAND_DOTS = 88;
+export const Q30_HEAD_DOTS = 96;
 
 export interface RenderOptions {
 	font: string;
@@ -64,13 +65,11 @@ export function bandRows(tape: Tape): number {
 
 /**
  * E10: always 88 rows (the driver centers them on its 96-dot head).
- * Q30: the raster is as wide as the label (8 dots/mm), with 1 mm kept clear at each edge.
+ * Q30: 96 rows (its whole head), text in the same centered band as the E10.
  */
 export function headFor(model: Model, tape: Tape): Head {
-	if (model === 'q30') {
-		const rows = Math.round(tape.widthMm * DPMM);
-		return { rows, band: Math.max(24, rows - 2 * DPMM) };
-	}
+	// Q30: 96-dot head like the D30; every working Q30/D30 client sends 12 bytes per line.
+	if (model === 'q30') return { rows: Q30_HEAD_DOTS, band: bandRows(tape) };
 	return { rows: BAND_DOTS, band: bandRows(tape) };
 }
 

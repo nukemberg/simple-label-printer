@@ -4,7 +4,7 @@ import { T15BtDriver, type T15Link } from './printer/t15';
 import { sleep } from './printer/frame';
 import { PrinterError, type Bitmap, type LabelSpec, type PrinterStatus } from './printer/types';
 import { tapeFromMedia, type Tape } from './tape';
-import { PhomemoQ30, Q30_SERVICE } from './q30';
+import { PhomemoQ30, Q30_SERVICE, type Q30Protocol } from './q30';
 import type { Model } from './render';
 
 export type LinkKind = 'ble' | 'serial';
@@ -129,7 +129,7 @@ export class Printer {
 		device.removeEventListener('gattserverdisconnected', this.onDropped);
 		device.addEventListener('gattserverdisconnected', this.onDropped);
 		if (!isSupvan(device)) {
-			const q30 = await withTimeout(PhomemoQ30.open(device), 12000, 'Bluetooth connect');
+			const q30 = await withTimeout(PhomemoQ30.open(device, (l) => this.logLine(l)), 12000, 'Bluetooth connect');
 			this.q30 = q30;
 			this.logLine(`BLE ${device.name}: ${q30.summary}`);
 			this.set({ state: 'ready', model: 'q30', tape: null, problem: undefined, batteryLevel: undefined });
@@ -240,11 +240,12 @@ export class Printer {
 		}, POLL_MS);
 	}
 
-	async print(bitmap: Bitmap, tape: Tape, opts: { copies: number; density: number; signal?: AbortSignal }) {
+	async print(bitmap: Bitmap, tape: Tape, opts: { copies: number; density: number; q30Protocol?: Q30Protocol; signal?: AbortSignal }) {
 		if (this.q30) {
 			this.set({ state: 'printing' });
 			try {
-				await this.q30.print(bitmap, { ...opts, continuous: tape.continuous });
+				this.logLine(`Q30 job: ${bitmap.width} lines x ${bitmap.height} dots, ${opts.q30Protocol ?? 'm110'}`);
+				await this.q30.print(bitmap, { ...opts, continuous: tape.continuous, protocol: opts.q30Protocol });
 			} finally {
 				if (this.q30) this.set({ state: 'ready' });
 			}

@@ -36,6 +36,13 @@ describe('Phomemo Q30 encoding', () => {
 		expect(encodeQ30(bitmap(10, 96, []), { density: 4, continuous: true })[0][10]).toBe(0x0b);
 	});
 
+	it('has a plain ESC/POS alternative', () => {
+		const parts = encodeQ30(bitmap(10, 96, []), { density: 4, continuous: false, protocol: 'escpos' });
+		expect([...parts[0]]).toEqual([0x1b, 0x40]);
+		expect([...parts[1]]).toEqual([0x1d, 0x76, 0x30, 0x00, 12, 0, 10, 0]);
+		expect([...parts[parts.length - 1]]).toEqual([0x1b, 0x64, 0x00]);
+	});
+
 	it('maps density 1..7 onto 3..15', () => {
 		expect([1, 4, 7].map(q30Density)).toEqual([3, 9, 15]);
 	});

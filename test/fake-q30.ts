@@ -13,7 +13,10 @@ export function install() {
 			return {
 				getPrimaryService: async (u: string) => {
 					if (!u.startsWith('0000ff00')) throw new DOMException('no service', 'NotFoundError');
-					return { getCharacteristic: async () => write };
+					return {
+						getCharacteristic: async (c: string) =>
+							c.startsWith('0000ff03') ? { addEventListener() {}, startNotifications: async () => {} } : write
+					};
 				}
 			};
 		},
