@@ -4,6 +4,8 @@ import { T15BtDriver, type T15Link } from './printer/t15';
 import { sleep } from './printer/frame';
 import { PrinterError, type Bitmap, type LabelSpec, type PrinterStatus } from './printer/types';
 import { tapeFromMedia, type Tape } from './tape';
+import { PhomemoQ30, Q30_SERVICE } from './q30';
+import type { Model } from './render';
 
 export type LinkKind = 'ble' | 'serial';
 export type State = 'off' | 'connecting' | 'ready' | 'printing';
@@ -11,6 +13,8 @@ export type State = 'off' | 'connecting' | 'ready' | 'printing';
 export interface PrinterInfo {
 	state: State;
 	name?: string;
+	/** Which printer is connected (set once connected). */
+	model?: Model;
 	/** Detected tape, null when none/unknown. */
 	tape: Tape | null;
 	/** Blocking problem reported by the printer (English, from the driver). */
@@ -21,6 +25,16 @@ export interface PrinterInfo {
 
 const RD_DEV_NAME = 0x16;
 const POLL_MS = 5000;
+
+/** GATT services of the Supvan printers (see printer/ble.ts). */
+const SUPVAN_SERVICES = [
+	'0000e0ff-3c17-d293-8e48-14fe2e4da212',
+	'0000a002-0000-1000-8000-00805f9b34fb',
+	'000018f0-0000-1000-8000-00805f9b34fb',
+	'0000fee7-0000-1000-8000-00805f9b34fb'
+];
+const isSupvan = (d: BluetoothDevice) => !!d.name?.startsWith('T0');
+const isPhomemo = (d: BluetoothDevice) => !!d.name?.startsWith('Q');
 
 export const bleSupported = () => typeof navigator !== 'undefined' && 'bluetooth' in navigator;
 export const serialSupported = () => typeof navigator !== 'undefined' && 'serial' in navigator;
@@ -34,6 +48,7 @@ export class Printer {
 	log: string[] = [];
 	private transport: ByteTransport | null = null;
 	private driver: T15BtDriver | null = null;
+	private q30: PhomemoQ30 | null = null;
 	private bleDevice: BluetoothDevice | null = null;
 	private pollTimer: ReturnType<typeof setTimeout> | null = null;
 	private polling = false;
@@ -87,7 +102,7 @@ export class Printer {
 		const bt = navigator.bluetooth as Bluetooth & { getDevices?: () => Promise<BluetoothDevice[]> };
 		if (typeof bt.getDevices !== 'function') return undefined;
 		const devices = await bt.getDevices();
-		return devices.find((d) => d.name?.startsWith('T0')) ?? devices[0];
+		return devices.find((d) => isSupvan(d) || isPhomemo(d)) ?? devices[0];
 	}
 
 	/** Show the browser's chooser and connect. Must run inside a click handler. */
@@ -99,7 +114,11 @@ export class Printer {
 			});
 			await this.openSerial(port);
 		} else {
-			const device = await WebBluetoothTransport.request();
+			const device = await navigator.bluetooth.requestDevice({
+				// Supvan E10: "T0…" serial; Phomemo Q30: "Q30…"/"Q…", or its ff00 service.
+				filters: [{ namePrefix: 'T0' }, { namePrefix: 'Q' }, { services: [Q30_SERVICE] }],
+				optionalServices: [...SUPVAN_SERVICES, Q30_SERVICE]
+			});
 			await this.openBle(device);
 		}
 	}
@@ -109,6 +128,13 @@ export class Printer {
 		this.bleDevice = device;
 		device.removeEventListener('gattserverdisconnected', this.onDropped);
 		device.addEventListener('gattserverdisconnected', this.onDropped);
+		if (!isSupvan(device)) {
+			const q30 = await withTimeout(PhomemoQ30.open(device), 12000, 'Bluetooth connect');
+			this.q30 = q30;
+			this.logLine(`BLE ${device.name}: ${q30.summary}`);
+			this.set({ state: 'ready', model: 'q30', tape: null, problem: undefined, batteryLevel: undefined });
+			return;
+		}
 		const transport = await withTimeout(WebBluetoothTransport.open(device, { preferWithoutResponse: true }), 12000, 'Bluetooth connect');
 		this.logLine(`BLE ${device.name}: ${transport.summary}`);
 		await this.attach(transport, device.name ?? '', 'ble');
@@ -135,7 +161,7 @@ export class Printer {
 				this.wireLog(driver);
 			}
 			this.driver = driver;
-			this.set({ state: 'ready', name: name || this.info.name });
+			this.set({ state: 'ready', name: name || this.info.name, model: 'e10' });
 			await this.refresh();
 			this.schedulePoll();
 		} catch (e) {
@@ -165,6 +191,8 @@ export class Printer {
 		this.pollTimer = null;
 		this.driver?.channel.dispose();
 		this.driver = null;
+		this.q30?.close();
+		this.q30 = null;
 		const t = this.transport;
 		this.transport = null;
 		await t?.close().catch(() => {});
@@ -213,6 +241,15 @@ export class Printer {
 	}
 
 	async print(bitmap: Bitmap, tape: Tape, opts: { copies: number; density: number; signal?: AbortSignal }) {
+		if (this.q30) {
+			this.set({ state: 'printing' });
+			try {
+				await this.q30.print(bitmap, { ...opts, continuous: tape.continuous });
+			} finally {
+				if (this.q30) this.set({ state: 'ready' });
+			}
+			return;
+		}
 		const d = this.driver;
 		if (!d) throw new PrinterError('Not connected', 'offline');
 		while (this.polling) await sleep(50);

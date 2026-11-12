@@ -4,8 +4,8 @@ import '@fontsource/heebo/900.css';
 import './style.css';
 import { registerSW } from 'virtual:pwa-register';
 import { bleSupported, Printer, serialSupported, type LinkKind, type PrinterInfo } from './connection';
-import { BAND_DOTS, DEFAULT_RENDER, DPMM, renderLabel, rotate180, type Rendered } from './render';
-import { MANUAL_TAPES, type Tape } from './tape';
+import { DEFAULT_RENDER, DPMM, headFor, renderLabel, rotate180, type Model, type Rendered } from './render';
+import { MANUAL_TAPES, Q30_TAPES, type Tape } from './tape';
 import type { Bitmap } from './printer/types';
 
 registerSW({ immediate: true });
@@ -22,6 +22,10 @@ interface Settings {
 	/** -1 = auto-detect, else index into MANUAL_TAPES. */
 	tape: number;
 	lastTape: Tape | null;
+	/** Index into Q30_TAPES: the Q30 can't report its labels. */
+	q30Tape: number;
+	/** Last printer model connected, so the preview matches it before connecting. */
+	model: Model;
 	recent: string[];
 }
 
@@ -33,6 +37,8 @@ const defaults: Settings = {
 	size: 1,
 	tape: -1,
 	lastTape: null,
+	q30Tape: 0,
+	model: 'e10',
 	recent: []
 };
 
@@ -69,6 +75,7 @@ const recentEl = $('recent');
 const dialog = $<HTMLDialogElement>('settings');
 const setLink = $<HTMLSelectElement>('set-link');
 const setTape = $<HTMLSelectElement>('set-tape');
+const setQ30Tape = $<HTMLSelectElement>('set-q30-tape');
 const setDensity = $<HTMLInputElement>('set-density');
 const densityOut = $<HTMLOutputElement>('density-out');
 const setWeight = $<HTMLSelectElement>('set-weight');
@@ -104,12 +111,19 @@ function hebrewError(e: unknown): string {
 /** The user closed the browser's chooser without picking anything. */
 const cancelled = (e: unknown) => e instanceof DOMException && (e.name === 'NotFoundError' || e.name === 'AbortError');
 
+const currentModel = (): Model => printer.info.model ?? settings.model;
+
 function currentTape(): Tape {
+	if (currentModel() === 'q30') return Q30_TAPES[settings.q30Tape] ?? Q30_TAPES[0];
 	if (settings.tape >= 0 && MANUAL_TAPES[settings.tape]) return MANUAL_TAPES[settings.tape];
 	return printer.info.tape ?? settings.lastTape ?? MANUAL_TAPES[0];
 }
 
 function onPrinterChange(info: PrinterInfo) {
+	if (info.model && info.model !== settings.model) {
+		settings.model = info.model;
+		save();
+	}
 	if (info.tape && JSON.stringify(info.tape) !== JSON.stringify(settings.lastTape)) {
 		settings.lastTape = info.tape;
 		save();
@@ -130,7 +144,8 @@ function onPrinterChange(info: PrinterInfo) {
 			if (info.problem) {
 				state = 'problem';
 				text = hebrewError(info.problem);
-			} else if (settings.tape >= 0) text = `${currentTape().label} (ידני)`;
+			} else if (info.model === 'q30') text = `Q30 · ${currentTape().label}`;
+			else if (settings.tape >= 0) text = `${currentTape().label} (ידני)`;
 			else text = info.tape ? info.tape.label : 'מחוברת · סוג המדבקה לא זוהה';
 	}
 	statusBtn.dataset.state = state;
@@ -161,7 +176,8 @@ function showMessage(text: string, ok = false) {
 // ---------- rendering / preview ----------
 
 function render(text: string): Rendered {
-	return renderLabel(text, currentTape(), { ...DEFAULT_RENDER, weight: settings.weight, continuousScale: settings.size });
+	const tape = currentTape();
+	return renderLabel(text, tape, { ...DEFAULT_RENDER, weight: settings.weight, continuousScale: settings.size }, headFor(currentModel(), tape));
 }
 
 function draw() {
@@ -169,13 +185,14 @@ function draw() {
 	rendered = render(textEl.value);
 	const { bitmap } = rendered;
 	// Show the whole tape width; the printed band sits in the middle.
-	const tapeRows = Math.max(BAND_DOTS, Math.round(tape.widthMm * DPMM));
-	const top = Math.floor((tapeRows - BAND_DOTS) / 2);
+	const rows = bitmap.height;
+	const tapeRows = Math.max(rows, Math.round(tape.widthMm * DPMM));
+	const top = Math.floor((tapeRows - rows) / 2);
 	previewEl.width = bitmap.width;
 	previewEl.height = tapeRows;
 	const c = previewEl.getContext('2d')!;
 	const img = c.createImageData(bitmap.width, tapeRows);
-	for (let r = 0; r < BAND_DOTS; r++)
+	for (let r = 0; r < rows; r++)
 		for (let col = 0; col < bitmap.width; col++)
 			if (bitmap.data[r * bitmap.width + col]) {
 				const i = ((r + top) * bitmap.width + col) * 4;
@@ -299,16 +316,19 @@ async function print(bitmap?: Bitmap) {
 }
 
 function testBitmap(): Bitmap {
-	const r = renderLabel('בדיקה 123 ABC', currentTape(), { ...DEFAULT_RENDER, weight: settings.weight });
+	const tape = currentTape();
+	const head = headFor(currentModel(), tape);
+	const r = renderLabel('בדיקה 123 ABC', tape, { ...DEFAULT_RENDER, weight: settings.weight }, head);
 	const b = r.bitmap;
 	const d = b.data.slice();
 	const w = b.width;
-	const band = Math.round((BAND_DOTS - Math.min(BAND_DOTS, Math.round((currentTape().widthMm - 2) * DPMM))) / 2);
+	const rows = b.height;
+	const band = Math.round((rows - head.band) / 2);
 	for (let x = 8; x < w - 8; x++) {
 		d[band * w + x] = 1;
-		d[(BAND_DOTS - 1 - band) * w + x] = 1;
+		d[(rows - 1 - band) * w + x] = 1;
 	}
-	for (let y = band; y < BAND_DOTS - band; y++) {
+	for (let y = band; y < rows - band; y++) {
 		d[y * w + 8] = 1;
 		d[y * w + w - 9] = 1;
 	}
@@ -348,6 +368,7 @@ setTape.replaceChildren(
 $('open-settings').addEventListener('click', () => {
 	setLink.value = settings.link;
 	setTape.value = String(settings.tape);
+	setQ30Tape.value = String(settings.q30Tape);
 	setDensity.value = String(settings.density);
 	densityOut.value = String(settings.density);
 	setWeight.value = String(settings.weight);
@@ -360,6 +381,12 @@ setLink.addEventListener('change', async () => {
 	settings.link = setLink.value as LinkKind;
 	save();
 	await printer.disconnect();
+});
+setQ30Tape.replaceChildren(...Q30_TAPES.map((t, i) => new Option(t.label, String(i))));
+setQ30Tape.addEventListener('change', () => {
+	settings.q30Tape = Number(setQ30Tape.value);
+	save();
+	onPrinterChange(printer.info);
 });
 setTape.addEventListener('change', () => {
 	settings.tape = Number(setTape.value);

@@ -1,7 +1,7 @@
 # Simple Label Printer
 
-A dead-simple, offline web app for printing text labels on a **Supvan E10** (Katasymbol E10)
-thermal label printer. Built as a replacement for the SUPRINT app for someone who just wants to
+A dead-simple, offline web app for printing text labels on a **Supvan E10** (Katasymbol E10) or
+**Phomemo Q30** thermal label printer. Built as a replacement for the SUPRINT app for someone who just wants to
 type a word and get a label.
 
 - **Type → Print.** One text box, a live preview, one big button. Hebrew UI.
@@ -12,6 +12,20 @@ type a word and get a label.
   as the text; on die-cut labels the text shrinks/wraps (up to 3 lines) to fit.
 - **Hebrew / RTL.** Direction per line from the first strong character, so Hebrew, English and
   numbers mix correctly ("סוכר חום 2025"). Uses the bundled Heebo font.
+
+## Phomemo Q30
+
+Connect the same way (it shows up as `Q30…`); the app recognizes it by name/service. Differences:
+
+- **No tape detection**: the Q30 doesn't report its labels. Pick the roll once in ⚙ →
+  **סוג מדבקה (Phomemo Q30)** (default 14×40 mm). Text then auto-sizes for that label.
+- No status (paper out, cover, battery) is read, so errors aren't shown; copies are sent with a
+  fixed pause between them.
+- Protocol from [flyingmaulwurf/ha-phomemo-q30](https://github.com/flyingmaulwurf/ha-phomemo-q30)
+  (confirmed on a real Q30 with gap labels), [dmsc/web-label-printer](https://github.com/dmsc/web-label-printer)
+  and [vivier/phomemo-tools](https://github.com/vivier/phomemo-tools). Continuous-roll mode
+  (`1F 11 0B`) and 15 mm-wide rasters are from the M110 docs and untested on a Q30.
+- Tested only against a recording fake in Chromium, not on a physical Q30.
 
 ## Requirements
 
@@ -77,6 +91,7 @@ npm run build   # static site in dist/
 | `src/render.ts` | Text → 1-bit label bitmap: auto font size, wrapping, RTL |
 | `src/tape.ts` | Tape id → size/type/color (catalog in `src/tapes.json`) |
 | `src/connection.ts` | Connect/reconnect (BLE or Serial), status + tape polling, print |
+| `src/q30.ts` | Phomemo Q30 encoder + BLE writer |
 | `src/printer/` | Vendored E10 driver, framing, transports, LZMA (see `LICENSE-khromov`) |
 | `test/` | Vitest tests, vendored emulator, fake Web Bluetooth for browser testing |
 

@@ -86,3 +86,19 @@ export const MANUAL_TAPES: Tape[] = [
 	{ id: 0, widthMm: 15, lengthMm: 30, continuous: false, gapMm: 3, color: '#ffffff', label: '' },
 	{ id: 0, widthMm: 15, lengthMm: 50, continuous: false, gapMm: 3, color: '#ffffff', label: '' }
 ].map((t) => ({ ...t, label: describe(t) }));
+
+/** Phomemo Q30 rolls (the printer can't report which is loaded; picked once in settings). */
+export const Q30_TAPES: Tape[] = [
+	{ widthMm: 14, lengthMm: 40, continuous: false },
+	{ widthMm: 12, lengthMm: 40, continuous: false },
+	{ widthMm: 15, lengthMm: 30, continuous: false },
+	{ widthMm: 15, lengthMm: 50, continuous: false },
+	{ widthMm: 14, lengthMm: 30, continuous: false },
+	{ widthMm: 12, lengthMm: 30, continuous: false },
+	{ widthMm: 12, lengthMm: 22, continuous: false },
+	{ widthMm: 15, lengthMm: 0, continuous: true },
+	{ widthMm: 12, lengthMm: 0, continuous: true }
+].map((t) => {
+	const tape = { id: 0, gapMm: t.continuous ? 0 : 3, color: '#ffffff', ...t };
+	return { ...tape, label: describe(tape) };
+});

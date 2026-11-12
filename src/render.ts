@@ -28,7 +28,7 @@ export const DEFAULT_RENDER: RenderOptions = {
 };
 
 export interface Rendered {
-	/** Rows run across the tape (BAND_DOTS), columns along it. 1 = black. */
+	/** Rows run across the tape (head.rows), columns along it. 1 = black. */
 	bitmap: Bitmap;
 	lengthMm: number;
 	fontPx: number;
@@ -49,9 +49,29 @@ export function directionOf(line: string): 'rtl' | 'ltr' {
 	return 'rtl';
 }
 
+export type Model = 'e10' | 'q30';
+
+/** Raster geometry: `rows` dots across the tape are sent, text may use the middle `band` of them. */
+export interface Head {
+	rows: number;
+	band: number;
+}
+
 /** Rows available for text: tape width minus 1 mm at each edge, at most the head's 88 dots. */
 export function bandRows(tape: Tape): number {
 	return Math.max(24, Math.min(BAND_DOTS, Math.round((tape.widthMm - 2) * DPMM)));
+}
+
+/**
+ * E10: always 88 rows (the driver centers them on its 96-dot head).
+ * Q30: the raster is as wide as the label (8 dots/mm), with 1 mm kept clear at each edge.
+ */
+export function headFor(model: Model, tape: Tape): Head {
+	if (model === 'q30') {
+		const rows = Math.round(tape.widthMm * DPMM);
+		return { rows, band: Math.max(24, rows - 2 * DPMM) };
+	}
+	return { rows: BAND_DOTS, band: bandRows(tape) };
 }
 
 interface Metrics {
@@ -129,9 +149,9 @@ function wraps(text: string, maxLines: number): string[][] {
  * - continuous tape: the text's own lines at the full band height; the label is as long as the text;
  * - die-cut labels: fixed box; a single typed line may be wrapped into up to 3 lines if that is bigger.
  */
-export function renderLabel(text: string, tape: Tape, o: RenderOptions = DEFAULT_RENDER): Rendered {
-	const rows = BAND_DOTS;
-	const maxH = bandRows(tape);
+export function renderLabel(text: string, tape: Tape, o: RenderOptions = DEFAULT_RENDER, head: Head = headFor('e10', tape)): Rendered {
+	const rows = head.rows;
+	const maxH = head.band;
 	const typed = text.replace(/\r/g, '').split('\n');
 	while (typed.length > 1 && !typed[typed.length - 1].trim()) typed.pop();
 	const empty = !text.trim();
