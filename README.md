@@ -25,7 +25,7 @@ Connect the same way (it shows up as `Q30…`); the app recognizes it by name/se
   (confirmed on a real Q30 with gap labels), [dmsc/web-label-printer](https://github.com/dmsc/web-label-printer)
   and [vivier/phomemo-tools](https://github.com/vivier/phomemo-tools). Continuous-roll mode
   (`1F 11 0B`) is from the M110 docs and untested on a Q30. The raster is always 96 dots (12 mm)
-  across, like every working D30/Q30 client; wider rasters made a real Q30 print nothing.
+  across, like every working D30/Q30 client (a 112-dot raster for 14 mm labels printed nothing).
 - If nothing prints, try ⚙ → **פקודות Q30 → חלופי** (plain ESC/POS, as dmsc/odensc send), and
   check ⚙ → יומן תקשורת for what was sent and what the printer answered on `ff03`.
 - Tested only against a recording fake in Chromium, not on a physical Q30.
